@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>汪汪快拍</title>
+<meta name="theme-color" content="#0984e3">
+<meta name="description" content="汪汪小精靈的手機快拍與語音打字：拍完自動貼進電腦正在用的軟體">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="汪汪快拍">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script src="lib/peerjs.min.js" defer></script>
+<script src="lib/jsQR.js" defer></script>
+<style>
+:root{
+  --blue:#0984e3; --blue-d:#0652a8; --green:#10ac84; --green-l:#d4f5e9; --yellow:#feca57; --red:#e74c3c;
+  --ink:#1e272e; --sub:#57606f; --line:#dfe4ea; --bg:#f4f7fb; --card:#fff;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:16px}
+button{font-family:inherit;cursor:pointer;border:0}
+.hidden{display:none!important}
+header{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;display:flex;align-items:center;gap:8px}
+header .logo{width:30px;height:30px;border-radius:8px}
+header h1{font-size:17px;margin:0;font-weight:800;white-space:nowrap}
+#pc-pill{margin-left:auto;display:flex;align-items:center;gap:6px;background:#eef2f7;border-radius:999px;padding:6px 10px 6px 8px;font-size:13px;font-weight:700;color:var(--sub);max-width:58vw;overflow:hidden}
+#pc-pill .dot{width:10px;height:10px;border-radius:50%;background:#b2bec3;flex:none}
+#pc-pill.ok .dot{background:#2ed573;box-shadow:0 0 0 3px #2ed57333}
+#pc-pill.wait .dot{background:var(--yellow);animation:blink 1s infinite}
+#pc-pill.bad .dot{background:var(--red)}
+#pc-pill span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes blink{50%{opacity:.25}}
+.tabs{display:flex;gap:6px;padding:8px 12px 0}
+.tab{flex:1;padding:10px 0;border-radius:12px 12px 0 0;background:#e3e9f1;color:var(--sub);font-weight:800;font-size:15px}
+.tab.on{background:var(--card);color:var(--blue)}
+main{padding:0 12px calc(24px + var(--safe-b))}
+.panel{background:var(--card);border-radius:0 0 16px 16px;padding:14px}
+.panel+.panel{display:none}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 1px 3px #0001}
+
+/* 提醒橫幅 */
+#alert{margin:12px 0 0;border-radius:16px;padding:14px;background:#fff4e0;border:2px solid #f0932b;}
+#alert h3{margin:0 0 6px;font-size:17px;color:#c0392b}
+#alert ol{margin:6px 0 10px 20px;padding:0;color:#4b4b4b;font-size:14px;line-height:1.6}
+.row{display:flex;gap:8px}
+.btn{flex:1;padding:13px 10px;border-radius:12px;font-weight:800;font-size:15px;background:#eef2f7;color:var(--ink)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.green{background:var(--green);color:#fff}
+.btn.big{font-size:18px;padding:18px 10px}
+.btn:active{transform:scale(.98)}
+
+/* 怎麼放 */
+.label{font-size:14px;font-weight:800;color:var(--sub);margin:2px 0 8px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.act{border:2px solid var(--line);background:#fff;border-radius:14px;padding:10px 8px;text-align:left;display:flex;gap:8px;align-items:center;color:var(--ink)}
+.act .ic{font-size:24px;line-height:1}
+.act b{display:block;font-size:15px}
+.act small{display:block;color:var(--sub);font-size:12px;margin-top:2px}
+.act.on{border-color:var(--blue);background:#eaf4ff;box-shadow:0 0 0 2px #0984e333 inset}
+.shoot{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;margin-top:12px}
+.shoot .btn{display:flex;flex-direction:column;align-items:center;gap:4px}
+.shoot .btn .e{font-size:30px}
+.target-hint{margin-top:10px;font-size:13px;color:var(--sub);text-align:center}
+
+/* 傳送紀錄 */
+#jobs{list-style:none;margin:0;padding:0}
+.job{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.job:first-child{border-top:0}
+.job img{width:56px;height:56px;object-fit:cover;border-radius:10px;background:#eee;flex:none}
+.job .t{flex:1;min-width:0}
+.job .s{font-size:14px;font-weight:700;line-height:1.35;word-break:break-all}
+.job .m{font-size:12px;color:var(--sub);margin-top:2px}
+.job .bar{height:5px;background:#eef2f7;border-radius:3px;margin-top:5px;overflow:hidden}
+.job .bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
+.job.ok .s{color:#0b8a5f}
+.job.warn .s{color:#c77700}
+.job.err .s{color:var(--red)}
+.job .more{background:#eef2f7;border-radius:10px;padding:8px 10px;font-weight:800;color:var(--sub)}
+.empty{color:#a4b0be;font-size:14px;text-align:center;padding:10px 0}
+
+/* 配對 */
+#pair h2{margin:0 0 6px;font-size:19px}
+#pair p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.6}
+.code-row{display:flex;gap:8px;margin-top:10px}
+.code-row input{flex:1;min-width:0;font-size:20px;letter-spacing:4px;text-transform:uppercase;padding:12px;border:2px solid var(--line);border-radius:12px;font-weight:800;text-align:center}
+#scanner{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}
+#scanner video{flex:1;width:100%;object-fit:cover}
+#scanner .frame{position:absolute;left:50%;top:45%;width:64vw;height:64vw;max-width:340px;max-height:340px;transform:translate(-50%,-50%);border:4px dashed var(--yellow);border-radius:18px}
+#scanner .bottom{padding:14px 14px calc(14px + var(--safe-b));background:#000c;color:#fff;text-align:center}
+#scanner .bottom p{margin:0 0 10px;font-size:15px}
+
+/* 語音 */
+.vtop{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--sub);gap:8px;flex-wrap:wrap}
+.vtop label{display:flex;align-items:center;gap:4px;font-weight:700}
+.vrow{display:flex;gap:8px;margin-top:10px}
+#voice-text{flex:1;min-height:150px;border:2px solid var(--line);border-radius:14px;padding:12px;font-size:18px;font-family:inherit;resize:vertical}
+#voice-send{width:84px;border-radius:14px;background:var(--blue);color:#fff;font-weight:800;font-size:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+#voice-send .e{font-size:28px}
+.puncts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.puncts button{min-width:42px;padding:9px 10px;border-radius:10px;background:#eef2f7;font-size:18px;font-weight:700;color:var(--ink)}
+#voice-status{margin-top:10px;font-size:14px;font-weight:700;color:var(--sub);min-height:20px}
+
+/* 底部抽屜 */
+.sheet-bg{position:fixed;inset:0;background:#0007;z-index:50;display:flex;align-items:flex-end}
+.sheet{background:#fff;width:100%;border-radius:20px 20px 0 0;padding:16px 14px calc(18px + var(--safe-b));max-height:86vh;overflow:auto}
+.sheet h3{margin:0 0 10px;font-size:18px}
+.sheet .grab{width:44px;height:5px;background:#dfe4ea;border-radius:3px;margin:-6px auto 12px}
+.pcs{list-style:none;padding:0;margin:0 0 10px}
+.pcs li{display:flex;align-items:center;gap:8px;padding:10px;border:2px solid var(--line);border-radius:12px;margin-bottom:8px}
+.pcs li.on{border-color:var(--blue);background:#eaf4ff}
+.pcs li .nm{flex:1;font-weight:800}
+.pcs li .cd{font-family:Consolas,monospace;color:var(--sub);font-size:13px}
+.pcs li button{background:#eef2f7;border-radius:8px;padding:7px 9px;font-weight:700;color:var(--sub)}
+.small{font-size:13px;color:var(--sub);line-height:1.6}
+#toast{position:fixed;left:50%;bottom:calc(24px + var(--safe-b));transform:translateX(-50%);background:#1e272ee6;color:#fff;padding:11px 16px;border-radius:12px;font-weight:700;font-size:15px;z-index:80;max-width:90vw;text-align:center;display:none}
+#install{margin-top:12px;background:#eaf4ff;border:2px solid #74b9ff;border-radius:16px;padding:12px 14px}
+#install b{font-size:15px}
+#install p{margin:6px 0 10px;font-size:14px;color:#2d3436;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <img class="logo" src="icon-192.png" alt="">
+  <h1>汪汪快拍</h1>
+  <button id="pc-pill" class="wait" onclick="openPcSheet()"><i class="dot"></i><span id="pc-pill-txt">尚未配對</span></button>
+</header>
+
+<div class="tabs">
+  <button class="tab on" id="tab-cam" onclick="switchTab('cam', true)">📸 拍照傳圖</button>
+  <button class="tab" id="tab-voice" onclick="switchTab('voice', true)">🎙️ 語音打字</button>
+</div>
+
+<main>
+  <div id="alert" class="hidden">
+    <h3 id="alert-title">⚠️ 連不到電腦</h3>
+    <div id="alert-body" class="small"></div>
+    <ol>
+      <li>電腦上的「汪汪小精靈」有開著嗎？</li>
+      <li>如果電腦換過配對碼，請按「重新掃碼」對準電腦上的 QR Code。</li>
+      <li>手機有網路嗎？（學校 Wi-Fi 擋住時，可改用行動網路）</li>
+    </ol>
+    <div class="row">
+      <button class="btn blue" onclick="startScan()">📷 重新掃碼</button>
+      <button class="btn" onclick="retryConnect()">🔄 再試一次</button>
+    </div>
+  </div>
+
+  <!-- 拍照 -->
+  <section class="panel" id="panel-cam">
+    <div class="label">① 拍完要怎麼放到電腦？</div>
+    <div class="acts" id="acts">
+      <button class="act" data-act="paste"><span class="ic">📋</span><span><b>貼上原圖</b><small>直接貼進電腦正在用的軟體</small></span></button>
+      <button class="act" data-act="straighten"><span class="ic">📄</span><span><b>拉正後貼上</b><small>考卷、講義、課本拍歪了</small></span></button>
+      <button class="act" data-act="cutout"><span class="ic">✂️</span><span><b>去背後貼上</b><small>作品、物品只留主體</small></span></button>
+      <button class="act" data-act="pc"><span class="ic">💻</span><span><b>只傳到電腦</b><small>先放著，在電腦上再處理</small></span></button>
+    </div>
+    <div class="label" style="margin-top:14px">② 拍照或選照片</div>
+    <div class="shoot">
+      <button class="btn blue big" onclick="pick('camera-input')"><span class="e">📸</span>拍照</button>
+      <button class="btn big" onclick="pick('gallery-input')"><span class="e">🖼️</span>相簿（可多張）</button>
+    </div>
+    <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="onFiles(this)">
+    <input type="file" id="gallery-input" accept="image/*" multiple class="hidden" onchange="onFiles(this)">
+    <div class="target-hint" id="target-hint">電腦會貼進您最後在用的軟體（例如 Word、簡報）</div>
+  </section>
+
+  <section class="panel" id="panel-voice">
+    <div class="vtop">
+      <label><input type="checkbox" id="chk-clear" checked> 傳送後清空</label>
+      <label><input type="checkbox" id="chk-enter"> 貼上後按 Enter</label>
+      <label>字體 <input type="range" id="font-range" min="14" max="32" value="18" oninput="setFont(this.value)" style="width:90px"></label>
+    </div>
+    <div class="vrow">
+      <textarea id="voice-text" placeholder="點這裡，再按鍵盤上的麥克風開始說話…"></textarea>
+      <button id="voice-send" onclick="sendVoice()"><span class="e">🚀</span>傳送</button>
+    </div>
+    <div class="puncts" id="puncts"></div>
+    <div id="voice-status"></div>
+  </section>
+
+  <div id="pair" class="card hidden">
+    <h2>👋 第一次使用：先跟電腦配對</h2>
+    <p>在電腦的汪汪小精靈打開「📱 手機快拍」，用下面的按鈕掃電腦上的 QR Code（黃色框那個或網址那個都可以）。</p>
+    <button class="btn blue big" style="width:100%" onclick="startScan()">📷 掃電腦上的 QR Code</button>
+    <div class="code-row">
+      <input id="code-input" maxlength="8" placeholder="或輸入配對碼" autocomplete="off" autocapitalize="characters">
+      <button class="btn green" style="flex:none;width:96px" onclick="useTypedCode()">連線</button>
+    </div>
+  </div>
+
+  <div id="install" class="hidden">
+    <b>📌 加到手機主畫面，以後一點就能拍</b>
+    <p id="install-text"></p>
+    <div class="row">
+      <button class="btn blue hidden" id="install-btn" onclick="doInstall()">加到主畫面</button>
+      <button class="btn" onclick="hideInstall()">知道了</button>
+    </div>
+  </div>
+
+  <div class="card" id="jobs-card">
+    <div class="label" style="display:flex;justify-content:space-between"><span>📨 最近傳的照片</span><span class="small">點一下可換方式再傳</span></div>
+    <ul id="jobs"></ul>
+    <div class="empty" id="jobs-empty">還沒有傳過照片</div>
+  </div>
+</main>
+
+<!-- 掃碼 -->
+<div id="scanner" class="hidden">
+  <video id="scan-video" playsinline muted></video>
+  <div class="frame"></div>
+  <canvas id="scan-canvas" class="hidden"></canvas>
+  <div class="bottom">
+    <p id="scan-tip">把電腦上的 QR Code 放進黃色框</p>
+    <div class="row">
+      <button class="btn" onclick="scanFromPhoto()">🖼️ 改用拍 QR 照片</button>
+      <button class="btn" onclick="stopScan()">取消</button>
+    </div>
+  </div>
+  <input type="file" id="qr-photo" accept="image/*" capture="environment" class="hidden" onchange="decodeQrPhoto(this)">
+</div>
+
+<!-- 電腦清單 -->
+<div class="sheet-bg hidden" id="pc-sheet" onclick="if(event.target===this)closeSheet('pc-sheet')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>🖥️ 要傳到哪台電腦？</h3>
+    <ul class="pcs" id="pcs"></ul>
+    <div class="row">
+      <button class="btn blue" onclick="closeSheet('pc-sheet');startScan()">📷 掃碼加入／重新配對</button>
+    </div>
+    <p class="small" style="margin-top:12px">每台電腦有自己的配對碼（家裡、學校各掃一次就好）。連不上時，手機會自動試試其他配對過的電腦。</p>
+    <p class="small" id="ver-line"></p>
+  </div>
+</div>
+
+<!-- 換方式再傳 -->
+<div class="sheet-bg hidden" id="job-sheet" onclick="if(event.target===this)closeSheet('job-sheet')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>這張照片要再怎麼傳？</h3>
+    <div class="acts" id="job-acts"></div>
+    <button class="btn" style="width:100%;margin-top:10px" onclick="closeSheet('job-sheet')">取消</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const APP_VER = '2.16.0';
+const ACTS = {
+  paste:      { ic:'📋', name:'貼上原圖',   desc:'直接貼進電腦正在用的軟體' },
+  straighten: { ic:'📄', name:'拉正後貼上', desc:'考卷、講義、課本拍歪了' },
+  cutout:     { ic:'✂️', name:'去背後貼上', desc:'作品、物品只留主體' },
+  pc:         { ic:'💻', name:'只傳到電腦', desc:'先放著，在電腦上再處理' },
+};
+const NTFY = 'https://ntfy.sh/';
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+};
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+let rooms = LS.get('puppy_rooms', []);          // [{code, name, last}]
+let room = LS.get('puppy_room', '');
+let act = LS.get('puppy_act', 'paste');
+let curTab = 'cam';
+let maxW = 1050, maxH = 1400, quality = 0.82;
+let pcState = 'none';     // none / wait / ok / bad
+let pcLegacy = false;     // 電腦端是舊版（不會回報）
+let lastPcSeen = 0;
+let helloTimer = null, helloId = '';
+let sse = null, pollTimer = null;
+let peer = null, conn = null;
+let manualTabLock = 0, lastCfgTs = Date.now() - 5000;
+const jobs = [];          // {id, act, thumb, blob, state, msg, sentAt}
+const seenReceipt = new Set();
+let sending = false;
+let installEvt = null;
+
+/* ── 小工具 ── */
+const $ = id => document.getElementById(id);
+function toast(t, ms){ const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = 'none', ms || 2400); }
+function vibrate(n){ try{ navigator.vibrate && navigator.vibrate(n || 40); }catch(e){} }
+let audioCtx = null;
+function ding(){ try{ audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); const n = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.frequency.setValueAtTime(784, n); o.frequency.setValueAtTime(1046.5, n + .07); g.gain.setValueAtTime(.2, n); g.gain.exponentialRampToValueAtTime(.01, n + .2); o.connect(g); g.connect(audioCtx.destination); o.start(n); o.stop(n + .2); }catch(e){} }
+function newId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function cleanCode(raw){
+  let s = String(raw || '').trim();
+  if (/^(VOICE|CAM):/i.test(s)) s = s.split(':')[1] || '';
+  const m = s.match(/[?&#]room=([A-Za-z0-9]+)/); if (m) s = m[1];
+  if (s.includes('puppysprite-pc-')) s = s.split('puppysprite-pc-')[1];
+  return s.replace(/[^A-Za-z0-9]/g, '').toUpperCase().substring(0, 8);
+}
+function roomName(code){ const r = rooms.find(x => x.code === code); return r ? r.name : ('電腦 ' + code); }
+function saveRooms(){ LS.set('puppy_rooms', rooms); LS.set('puppy_room', room); }
+
+/* ── 開始 ── */
+window.addEventListener('DOMContentLoaded', () => {
+  buildPuncts();
+  document.querySelectorAll('#acts .act').forEach(b => b.onclick = () => setAct(b.dataset.act));
+  setAct(act, true);
+  setFont(LS.get('puppy_font', 18));
+  $('chk-enter').checked = !!LS.get('puppy_enter', false);
+  $('chk-clear').checked = LS.get('puppy_clear', true) !== false;
+  $('chk-enter').onchange = e => LS.set('puppy_enter', e.target.checked);
+  $('chk-clear').onchange = e => LS.set('puppy_clear', e.target.checked);
+  $('ver-line').textContent = '汪汪快拍 v' + APP_VER;
+
+  const p = new URLSearchParams(location.search);
+  const urlRoom = cleanCode(p.get('room') || location.hash.replace('#', ''));
+  const urlTab = p.get('tab');
+  if (p.get('maxW') && p.get('maxH')) { maxW = +p.get('maxW') || maxW; maxH = +p.get('maxH') || maxH; }
+  if (urlRoom && urlRoom.length >= 4) {
+    addRoom(urlRoom);
+    // 從主畫面圖示打開時（網址裡固定是第一次的配對碼），尊重使用者後來選的電腦
+    if (!isStandalone() || !room || !rooms.some(r => r.code === room)) room = urlRoom;
+    saveRooms();
+    // 網址只留配對碼：之後「加到主畫面」的網址乾淨又固定
+    try { history.replaceState(null, '', location.pathname + '?room=' + urlRoom); } catch (e) {}
+  }
+  switchTab(urlTab === 'voice' ? 'voice' : (LS.get('puppy_tab', 'cam') === 'voice' && !urlTab ? 'voice' : 'cam'), false);
+  if (room) connect(); else showPair();
+  renderJobs();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && room) {
+    if (Date.now() - lastPcSeen > 25000) sayHello();
+    if (!sse || sse.readyState === 2) startCfg();
+  }
+});
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+window.addEventListener('appinstalled', () => { hideInstall(); toast('✓ 已加到主畫面'); });
+
+function addRoom(code){
+  if (!rooms.some(r => r.code === code)) {
+    rooms.push({ code, name: rooms.length ? ('電腦 ' + (rooms.length + 1)) : '我的電腦', last: Date.now() });
+  }
+}
+
+/* ── 分頁 ── */
+function switchTab(t, manual){
+  curTab = t; LS.set('puppy_tab', t);
+  if (manual) { manualTabLock = Date.now() + 15000; lastCfgTs = Date.now(); }
+  $('tab-cam').classList.toggle('on', t === 'cam'); $('tab-voice').classList.toggle('on', t === 'voice');
+  $('panel-cam').style.display = t === 'cam' ? 'block' : 'none';
+  $('panel-voice').style.display = t === 'voice' ? 'block' : 'none';
+  $('jobs-card').style.display = t === 'cam' ? 'block' : 'none';
+}
+function setAct(a, quiet){
+  if (!ACTS[a]) a = 'paste';
+  act = a; LS.set('puppy_act', a);
+  document.querySelectorAll('#acts .act').forEach(b => b.classList.toggle('on', b.dataset.act === a));
+  $('target-hint').textContent = a === 'pc' ? '照片會放在電腦的「手機快拍」視窗，也會複製好，可在電腦按 Ctrl+V'
+    : a === 'straighten' ? '電腦會找出紙張四個角拉正，再貼進您最後在用的軟體'
+    : a === 'cutout' ? '電腦會用 AI 只留下主體，再貼進您最後在用的軟體'
+    : '電腦會貼進您最後在用的軟體（例如 Word、簡報）';
+  if (!quiet) vibrate(15);
+}
+
+/* ── 連線狀態 ── */
+function setPc(state, text){
+  pcState = state;
+  const pill = $('pc-pill'); pill.className = state;
+  $('pc-pill-txt').textContent = text;
+  const showAlert = state === 'bad';
+  $('alert').classList.toggle('hidden', !showAlert);
+  if (showAlert) $('alert-body').textContent = '目前選的是「' + roomName(room) + '」（配對碼 ' + room + '）。';
+}
+function showPair(){
+  $('pair').classList.remove('hidden');
+  setPc('wait', '尚未配對');
+  $('alert').classList.add('hidden');
+}
+function connect(){
+  $('pair').classList.add('hidden');
+  pcLegacy = false;
+  setPc('wait', '連線中…' + roomName(room));
+  startCfg();
+  startPeer();
+  sayHello();
+}
+function retryConnect(){ setPc('wait', '再試一次…'); triedOthers = false; connect(); }
+function pcAlive(info){
+  lastPcSeen = Date.now();
+  clearTimeout(helloTimer);
+  const r = rooms.find(x => x.code === room); if (r) { r.last = Date.now(); saveRooms(); }
+  if (pcState !== 'ok') {
+    setPc('ok', '已連上：' + roomName(room));
+    maybeShowInstall();
+  }
+}
+let triedOthers = false;
+function sayHello(){
+  if (!room) return;
+  helloId = newId();
+  const body = JSON.stringify({ type: 'hello', id: helloId, tab: curTab, v: APP_VER });
+  fetch(NTFY + 'puppysprite_direct_' + room, { method: 'POST', body }).catch(() => {});
+  try { if (conn && conn.open) conn.send({ type: 'hello', id: helloId }); } catch (e) {}
+  clearTimeout(helloTimer);
+  helloTimer = setTimeout(() => {
+    if (Date.now() - lastPcSeen < 12000) return;
+    if (!triedOthers && rooms.length > 1) { triedOthers = true; tryOtherRooms(); return; }
+    setPc('bad', '連不到：' + roomName(room));
+    vibrate([60, 60, 60]);
+  }, 10000);
+}
+// 目前這台沒回應：問問其他配對過的電腦，誰在線上就自動切過去
+async function tryOtherRooms(){
+  setPc('wait', '找其他電腦中…');
+  const others = rooms.filter(r => r.code !== room).slice(0, 5);
+  others.forEach(r => fetch(NTFY + 'puppysprite_direct_' + r.code, { method: 'POST', body: JSON.stringify({ type: 'hello', id: newId(), tab: curTab, v: APP_VER }) }).catch(() => {}));
+  await new Promise(res => setTimeout(res, 5000));
+  for (const r of others) {
+    try {
+      const txt = await (await fetch(NTFY + 'puppysprite_cfg_' + r.code + '/json?poll=1&since=12s')).text();
+      if (txt.split('\n').some(l => { try { const o = JSON.parse(l); const m = JSON.parse(o.message || '{}'); return m.pc === 'online' || m.type === 'set_resolution'; } catch (e) { return false; } })) {
+        room = r.code; saveRooms();
+        toast('🖥️ 已自動切換到「' + r.name + '」', 3200);
+        connect();
+        return;
+      }
+    } catch (e) {}
+  }
+  if (Date.now() - lastPcSeen > 12000) { setPc('bad', '連不到：' + roomName(room)); vibrate([60, 60, 60]); }
+}
+
+/* ── 電腦 → 手機：設定與回報（ntfy） ── */
+function startCfg(){
+  try { if (sse) sse.close(); } catch (e) {}
+  clearInterval(pollTimer);
+  const code = room;
+  try {
+    sse = new EventSource(NTFY + 'puppysprite_cfg_' + code + '/sse');
+    sse.onmessage = ev => { try { const o = JSON.parse(ev.data); if (o.event === 'message' && o.message) onPcMsg(JSON.parse(o.message), o.time, code); } catch (e) {} };
+  } catch (e) {}
+  // 備援：有些網路擋 SSE，就每 5 秒問一次
+  pollTimer = setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    if (sse && sse.readyState === 1 && Date.now() - lastPcSeen < 60000) return;
+    fetch(NTFY + 'puppysprite_cfg_' + code + '/json?poll=1&since=10s').then(r => r.text()).then(t => t.split('\n').forEach(l => {
+      try { const o = JSON.parse(l); if (o.event === 'message' && o.message) onPcMsg(JSON.parse(o.message), o.time, code); } catch (e) {}
+    })).catch(() => {});
+  }, 5000);
+}
+function onPcMsg(m, timeSec, code){
+  if (!m || typeof m !== 'object' || code !== room) return;
+  if (!m.ts && timeSec) m.ts = timeSec * 1000;
+  if (m.type === 'receipt') { pcAlive(); onReceipt(m); return; }
+  if (m.type === 'set_resolution' || m.type === 'switch_tab' || m.maxW) {
+    if (m.ts && m.ts < Date.now() - 60000) return;
+    if (m.pc === 'online' || (m.ts && m.ts > Date.now() - 20000)) { if (!m.ver) pcLegacy = true; else pcLegacy = false; pcAlive(); }
+    if (m.maxW && m.maxH) { maxW = +m.maxW || maxW; maxH = +m.maxH || maxH; }
+    if (m.quality) quality = +m.quality || quality;
+    const t = m.tab || m.activeTab;
+    if (m.hello) return;                      // 回應我打招呼的，不切分頁
+    if ((t === 'cam' || t === 'voice') && t !== curTab) {
+      if (Date.now() < manualTabLock && (!m.ts || m.ts <= lastCfgTs + 1500)) return;
+      if (m.ts) lastCfgTs = m.ts;
+      switchTab(t, false);
+    } else if (m.ts) lastCfgTs = m.ts;
+  }
+}
+
+/* ── WebRTC 直連（電腦的快拍視窗開著時最快） ── */
+function startPeer(){
+  if (typeof Peer === 'undefined') { setTimeout(startPeer, 500); return; }
+  try { if (peer && !peer.destroyed) peer.destroy(); } catch (e) {}
+  conn = null;
+  const code = room;
+  try {
+    peer = new Peer({ config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] } });
+    peer.on('open', () => {
+      if (code !== room) return;
+      const c = peer.connect('puppysprite-pc-' + code, { reliable: true });
+      c.on('open', () => { conn = c; pcAlive(); try { c.send({ type: 'hello', id: newId() }); } catch (e) {} });
+      c.on('data', d => onPeerData(d));
+      c.on('close', () => { if (conn === c) conn = null; });
+      c.on('error', () => { if (conn === c) conn = null; });
+    });
+    peer.on('error', () => {});
+  } catch (e) {}
+}
+const ackWaiters = {};
+function onPeerData(d){
+  if (!d || typeof d !== 'object') return;
+  if (d.type === 'ack') { pcAlive(); const w = ackWaiters[d.id] || ackWaiters['*']; if (w) w(); return; }
+  if (d.type === 'receipt') { pcAlive(); onReceipt(d); return; }
+  if (d.type === 'pong') { pcAlive(); return; }
+  if (d.type === 'set_resolution') { if (d.maxW) { maxW = +d.maxW; maxH = +d.maxH; } if (d.quality) quality = +d.quality; pcAlive(); return; }
+  if (d.type === 'switch_tab' && (d.tab === 'cam' || d.tab === 'voice') && d.tab !== curTab && Date.now() > manualTabLock) switchTab(d.tab, false);
+  if (d.type === 'voice_ack') { pcAlive(); }
+}
+
+/* ── 選照片 → 送出 ── */
+function pick(id){
+  if (!room) { toast('請先跟電腦配對'); showPair(); return; }
+  const el = $(id); el.value = ''; el.click();
+}
+function onFiles(input){
+  const files = Array.from(input.files || []).filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(f.name));
+  if (!files.length) return;
+  ding(); vibrate(30);
+  files.forEach(f => { const j = { id: newId(), act, file: f, state: 'prep', msg: '準備中…', pct: 0, room }; jobs.unshift(j); });
+  jobs.splice(30);
+  renderJobs();
+  if (files.length > 1) toast('📨 ' + files.length + ' 張照片會依序傳送');
+  pump();
+}
+async function pump(){
+  if (sending) return;
+  const j = jobs.slice().reverse().find(x => x.state === 'prep');
+  if (!j) return;
+  sending = true;
+  try { await sendJob(j); } catch (e) { setJob(j, 'err', '傳送失敗：' + (e && e.message ? e.message : '網路問題') + '（點一下重傳）'); }
+  sending = false;
+  setTimeout(pump, 150);
+}
+async function shrink(file){
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) {
+    src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('讀不到這張圖')); im.src = URL.createObjectURL(file); });
+  }
+  const w0 = src.width, h0 = src.height;
+  const lim = Math.max(maxW, maxH) || 1400, limS = Math.min(maxW, maxH) || 1050;
+  let s = Math.min(1, lim / Math.max(w0, h0), limS / Math.min(w0, h0));
+  if (j_act_needs_detail(currentJobAct)) s = Math.min(1, Math.max(s, Math.min(1, 2000 / Math.max(w0, h0))));
+  const w = Math.max(1, Math.round(w0 * s)), h = Math.max(1, Math.round(h0 * s));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(src, 0, 0, w, h);
+  try { src.close && src.close(); } catch (e) {}
+  const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', quality || 0.82));
+  const tc = document.createElement('canvas'), ts = 112 / Math.max(w, h); tc.width = Math.round(w * ts); tc.height = Math.round(h * ts);
+  tc.getContext('2d').drawImage(cv, 0, 0, tc.width, tc.height);
+  return { blob, thumb: tc.toDataURL('image/jpeg', .7), w, h };
+}
+let currentJobAct = 'paste';
+function j_act_needs_detail(a){ return a === 'straighten'; }   // 拉正需要較清楚的字，至少 2000px
+async function sendJob(j){
+  if (!j.blob) {
+    currentJobAct = j.act;
+    setJob(j, 'prep', '整理照片中…');
+    const r = await shrink(j.file);
+    j.blob = r.blob; j.thumb = r.thumb; j.size = r.w + '×' + r.h; j.file = null;
+    renderJobs();
+  }
+  j.sentRoom = room;
+  seenReceipt.forEach(k => { if (k.startsWith(j.id + ':')) seenReceipt.delete(k); });
+  // 1. 有直連就先走直連（最快）；4 秒沒回應再走雲端
+  if (conn && conn.open) {
+    setJob(j, 'send', '直連傳送中…', 30);
+    const ok = await sendByPeer(j);
+    if (ok) { afterSent(j); return; }
+  }
+  // 2. 雲端通道（電腦端快拍視窗關著也收得到）
+  await sendByNtfy(j);
+  afterSent(j);
+}
+function blobToDataUrl(b){ return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); }); }
+async function sendByPeer(j){
+  try {
+    const durl = await blobToDataUrl(j.blob);
+    const size = 24000, total = Math.ceil(durl.length / size);
+    const acked = new Promise(res => { ackWaiters[j.id] = () => res(true); setTimeout(() => res(false), 4500); });
+    for (let i = 0; i < total; i++) conn.send({ type: 'snapshot_chunk', id: j.id, act: j.act, index: i, total, chunk: durl.slice(i * size, (i + 1) * size) });
+    const ok = await acked; delete ackWaiters[j.id];
+    return ok;
+  } catch (e) { return false; }
+}
+function sendByNtfy(j){
+  return new Promise((res, rej) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', NTFY + 'puppysprite_direct_' + j.sentRoom);
+    x.setRequestHeader('Filename', 'snap__' + j.id + '__' + j.act + '.jpg');
+    x.setRequestHeader('Message', JSON.stringify({ type: 'snap', id: j.id, act: j.act }));
+    x.upload.onprogress = e => { if (e.lengthComputable) setJob(j, 'send', '上傳中 ' + Math.round(e.loaded / e.total * 100) + '%', Math.round(e.loaded / e.total * 100)); };
+    x.onload = () => (x.status >= 200 && x.status < 300) ? res() : rej(new Error(x.status === 429 ? '傳太多了，等一下再試' : ('伺服器回應 ' + x.status)));
+    x.onerror = () => rej(new Error('網路連不上'));
+    x.ontimeout = () => rej(new Error('網路太慢'));
+    x.timeout = 90000;
+    setJob(j, 'send', '上傳中…', 3);
+    x.send(j.blob);
+  });
+}
+function afterSent(j){
+  j.sentAt = Date.now();
+  if (pcLegacy) { setJob(j, 'ok', '✓ 已送到電腦'); return; }
+  if (j.state === 'send' || j.state === 'prep') setJob(j, 'wait', '已送出，等電腦回報…', 100);
+  setTimeout(() => {
+    if (j.state === 'wait') {
+      setJob(j, 'err', '⚠️ 電腦沒有回應（點一下重傳）');
+      if (Date.now() - lastPcSeen > 20000) { setPc('bad', '連不到：' + roomName(room)); vibrate([60, 60, 60]); }
+      else sayHello();
+    }
+  }, 20000);
+  setTimeout(() => { if (j.state === 'got') setJob(j, 'warn', '電腦處理太久了，請看一下電腦畫面'); }, 60000);
+}
+function onReceipt(m){
+  const key = m.id + ':' + m.stage;
+  if (seenReceipt.has(key)) return; seenReceipt.add(key);
+  const j = jobs.find(x => x.id === m.id);
+  if (!j) return;
+  if (m.stage === 'received') { if (j.state !== 'ok' && j.state !== 'warn') setJob(j, 'got', m.msg || '電腦收到了，處理中…', 100); }
+  else if (m.stage === 'done') {
+    setJob(j, m.ok ? 'ok' : 'warn', m.msg || (m.ok ? '✓ 完成' : '完成，但有狀況'));
+    if (m.ok) { vibrate(25); }
+    else vibrate([40, 50, 40]);
+  }
+}
+
+/* ── 傳送紀錄 ── */
+function setJob(j, state, msg, pct){ j.state = state; j.msg = msg; if (pct !== undefined) j.pct = pct; renderJob(j); }
+function renderJobs(){
+  const ul = $('jobs'); ul.innerHTML = '';
+  jobs.forEach(j => { const li = document.createElement('li'); li.className = 'job'; li.id = 'job-' + j.id; ul.appendChild(li); renderJob(j); });
+  $('jobs-empty').style.display = jobs.length ? 'none' : 'block';
+}
+function renderJob(j){
+  const li = $('job-' + j.id); if (!li) { renderJobs(); return; }
+  li.className = 'job ' + (j.state === 'ok' ? 'ok' : j.state === 'warn' ? 'warn' : j.state === 'err' ? 'err' : '');
+  const A = ACTS[j.act] || ACTS.paste;
+  const busy = ['prep', 'send', 'wait', 'got'].includes(j.state);
+  li.innerHTML = '<img alt="">' +
+    '<div class="t"><div class="s"></div><div class="m"></div>' + (busy ? '<div class="bar"><i></i></div>' : '') + '</div>' +
+    (busy ? '' : '<button class="more">' + (j.state === 'err' ? '重傳' : '⋯') + '</button>');
+  if (j.thumb) li.querySelector('img').src = j.thumb;
+  li.querySelector('.s').textContent = j.msg;
+  li.querySelector('.m').textContent = A.ic + ' ' + A.name + (j.size ? '・' + j.size : '') + (j.sentRoom && rooms.length > 1 ? '・' + roomName(j.sentRoom) : '');
+  const bar = li.querySelector('.bar i'); if (bar) bar.style.width = (j.state === 'got' ? 100 : (j.pct || 5)) + '%';
+  const more = li.querySelector('.more');
+  if (more) more.onclick = () => j.state === 'err' ? resend(j, j.act) : openJobSheet(j);
+  li.onclick = e => { if (e.target === more) return; if (!busy) openJobSheet(j); };
+}
+function resend(j, a){
+  if (!j.blob && !j.file) { toast('這張照片已經不在了，請重新拍'); return; }
+  const n = { id: newId(), act: a, blob: j.blob, file: j.file, thumb: j.thumb, size: j.size, state: 'prep', msg: '準備重傳…', pct: 0 };
+  jobs.unshift(n); jobs.splice(30); renderJobs(); pump();
+}
+function openJobSheet(j){
+  const box = $('job-acts'); box.innerHTML = '';
+  Object.keys(ACTS).forEach(k => {
+    const A = ACTS[k], b = document.createElement('button');
+    b.className = 'act' + (k === j.act ? ' on' : '');
+    b.innerHTML = '<span class="ic">' + A.ic + '</span><span><b>' + A.name + '</b><small>' + (k === j.act ? '用同樣方式再傳一次' : A.desc) + '</small></span>';
+    b.onclick = () => { closeSheet('job-sheet'); resend(j, k); };
+    box.appendChild(b);
+  });
+  $('job-sheet').classList.remove('hidden');
+}
+function closeSheet(id){ $(id).classList.add('hidden'); }
+
+/* ── 電腦清單 ── */
+function openPcSheet(){
+  if (!rooms.length) { showPair(); return; }
+  const ul = $('pcs'); ul.innerHTML = '';
+  rooms.forEach(r => {
+    const li = document.createElement('li'); li.className = r.code === room ? 'on' : '';
+    li.innerHTML = '<span class="nm"></span><span class="cd"></span><button data-k="ren">改名</button><button data-k="del">移除</button>';
+    li.querySelector('.nm').textContent = (r.code === room ? '✅ ' : '') + r.name;
+    li.querySelector('.cd').textContent = r.code;
+    li.onclick = e => {
+      const k = e.target.dataset && e.target.dataset.k;
+      if (k === 'ren') { const n = prompt('幫這台電腦取個名字（例如：學校、家裡）', r.name); if (n && n.trim()) { r.name = n.trim().slice(0, 12); saveRooms(); openPcSheet(); setPc(pcState, $('pc-pill-txt').textContent.replace(/：.*/, '：' + roomName(room))); } return; }
+      if (k === 'del') { if (confirm('移除「' + r.name + '」？之後要用需要重新掃碼。')) { rooms = rooms.filter(x => x.code !== r.code); if (room === r.code) room = rooms.length ? rooms[0].code : ''; saveRooms(); closeSheet('pc-sheet'); room ? connect() : showPair(); } return; }
+      if (r.code !== room) { room = r.code; saveRooms(); closeSheet('pc-sheet'); triedOthers = true; connect(); toast('🖥️ 改傳到「' + r.name + '」'); }
+      else closeSheet('pc-sheet');
+    };
+    ul.appendChild(li);
+  });
+  $('pc-sheet').classList.remove('hidden');
+}
+
+/* ── 配對 ── */
+function useTypedCode(){
+  const c = cleanCode($('code-input').value);
+  if (c.length < 4) { toast('配對碼是電腦上顯示的 6 個英數字'); return; }
+  pairWith(c);
+}
+function pairWith(code){
+  const isNew = !rooms.some(r => r.code === code);
+  addRoom(code); room = code; saveRooms();
+  try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  ding(); vibrate(60);
+  toast(isNew ? '✓ 配對成功：' + roomName(code) : '✓ 已連到：' + roomName(code));
+  triedOthers = true;
+  connect();
+  if (isNew && rooms.length > 1) setTimeout(() => {
+    const n = prompt('這是第 ' + rooms.length + ' 台電腦，幫它取個名字吧（例如：學校、家裡）', roomName(code));
+    if (n && n.trim()) { const r = rooms.find(x => x.code === code); r.name = n.trim().slice(0, 12); saveRooms(); setPc(pcState, pcState === 'ok' ? '已連上：' + r.name : '連線中…' + r.name); }
+  }, 600);
+}
+let scanStream = null, scanRaf = 0, detector = null;
+async function startScan(){
+  $('scanner').classList.remove('hidden');
+  $('scan-tip').textContent = '把電腦上的 QR Code 放進黃色框';
+  try {
+    if ('BarcodeDetector' in window) { try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; } }
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    const v = $('scan-video'); v.srcObject = scanStream; await v.play();
+    scanLoop();
+  } catch (e) {
+    $('scan-tip').textContent = '開不了鏡頭（可能沒允許相機權限）。請按「改用拍 QR 照片」，或回上一頁輸入配對碼。';
+  }
+}
+let lastScanT = 0;
+async function scanLoop(){
+  if (!scanStream) return;
+  const v = $('scan-video');
+  const now = performance.now();
+  if (v.readyState >= 2 && v.videoWidth && now - lastScanT > 160) {
+    lastScanT = now;
+    try {
+      let txt = null;
+      if (detector) { const r = await detector.detect(v); if (r && r[0]) txt = r[0].rawValue; }
+      else if (typeof jsQR !== 'undefined') {
+        const cv = $('scan-canvas'), tw = 640, th = Math.round(v.videoHeight / v.videoWidth * tw);
+        cv.width = tw; cv.height = th; const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(v, 0, 0, tw, th);
+        const q = jsQR(ctx.getImageData(0, 0, tw, th).data, tw, th, { inversionAttempts: 'dontInvert' });
+        if (q) txt = q.data;
+      }
+      if (txt && handleQrText(txt)) return;
+    } catch (e) {}
+  }
+  scanRaf = requestAnimationFrame(scanLoop);
+}
+function handleQrText(txt){
+  const c = cleanCode(txt);
+  if (!c || c.length < 4) { $('scan-tip').textContent = '這個 QR Code 不是汪汪小精靈的配對碼，請對準電腦上的 QR Code'; return false; }
+  if (/tab=voice|^VOICE:/i.test(txt)) switchTab('voice', true);
+  stopScan();
+  pairWith(c);
+  return true;
+}
+function stopScan(){
+  cancelAnimationFrame(scanRaf);
+  if (scanStream) scanStream.getTracks().forEach(t => t.stop());
+  scanStream = null;
+  $('scanner').classList.add('hidden');
+}
+function scanFromPhoto(){ const el = $('qr-photo'); el.value = ''; el.click(); }
+async function decodeQrPhoto(input){
+  const f = input.files && input.files[0]; if (!f) return;
+  try {
+    const bmp = await createImageBitmap(f);
+    const s = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+    const ctx = cv.getContext('2d'); ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+    let txt = null;
+    if (detector) { const r = await detector.detect(cv); if (r && r[0]) txt = r[0].rawValue; }
+    if (!txt && typeof jsQR !== 'undefined') { const q = jsQR(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height); if (q) txt = q.data; }
+    if (txt && handleQrText(txt)) return;
+    $('scan-tip').textContent = '照片裡找不到 QR Code，請靠近一點再拍一次';
+  } catch (e) { $('scan-tip').textContent = '讀不到這張照片，請再拍一次'; }
+}
+
+/* ── 加到主畫面 ── */
+function maybeShowInstall(){
+  if (isStandalone() || LS.get('puppy_install_hide', 0) > Date.now()) return;
+  $('install-text').innerHTML = isIOS
+    ? '按 Safari 下方的「分享」<b>⎙</b>，往下找「<b>加入主畫面</b>」。以後點桌面的狗狗相機圖示，直接就能拍，不用再掃 QR Code。'
+    : (installEvt ? '按下面的按鈕，手機桌面會多一個狗狗相機圖示，以後一點就能拍，不用再掃 QR Code。'
+                  : '按瀏覽器右上角「⋮」→「<b>加到主畫面</b>」（或「安裝應用程式」）。以後點桌面的狗狗相機圖示就能拍。');
+  $('install-btn').classList.toggle('hidden', !installEvt);
+  $('install').classList.remove('hidden');
+}
+async function doInstall(){ if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; hideInstall(); }
+function hideInstall(){ $('install').classList.add('hidden'); LS.set('puppy_install_hide', Date.now() + 7 * 864e5); }
+
+/* ── 語音打字 ── */
+function buildPuncts(){
+  const box = $('puncts');
+  ['，', '。', '、', '？', '！', '；', '：', '「', '」', '（', '）'].forEach(ch => {
+    const b = document.createElement('button'); b.textContent = ch;
+    b.onmousedown = e => e.preventDefault(); b.onclick = () => insertText(ch); box.appendChild(b);
+  });
+  const nl = document.createElement('button'); nl.textContent = '↵ 換行'; nl.style.fontSize = '14px';
+  nl.onmousedown = e => e.preventDefault(); nl.onclick = () => insertText('\n'); box.appendChild(nl);
+  const cl = document.createElement('button'); cl.textContent = '🧹 清空'; cl.style.cssText = 'font-size:14px;background:#fecaca;color:#c0392b';
+  cl.onclick = () => { $('voice-text').value = ''; }; box.appendChild(cl);
+}
+function insertText(ch){
+  const ta = $('voice-text'), s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? ta.value.length;
+  ta.value = ta.value.slice(0, s) + ch + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + ch.length; ta.focus();
+}
+function setFont(v){ $('voice-text').style.fontSize = v + 'px'; $('font-range').value = v; LS.set('puppy_font', +v); }
+async function sendVoice(){
+  if (!room) { toast('請先跟電腦配對'); showPair(); return; }
+  const ta = $('voice-text'), text = ta.value.trim();
+  if (!text) { toast('請先說話或打字'); return; }
+  const payload = { type: 'voice_text', id: newId(), text, autoEnter: $('chk-enter').checked, timestamp: Date.now() };
+  try { if (conn && conn.open) conn.send(payload); } catch (e) {}
+  $('voice-status').textContent = '傳送中…';
+  try {
+    const r = await fetch(NTFY + 'puppysprite_direct_' + room, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!r.ok) throw new Error(r.status);
+    ding(); vibrate(30);
+    $('voice-status').textContent = '✓ 已送出：「' + text.slice(0, 16) + (text.length > 16 ? '…' : '') + '」';
+    if ($('chk-clear').checked) ta.value = '';
+  } catch (e) {
+    $('voice-status').textContent = '⚠️ 沒送出去，請檢查網路後再按一次';
+  }
+}
+</script>
+</body>
+</html>
