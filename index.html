@@ -321,7 +321,7 @@ body.typing .tabs{display:none}
 
 <script>
 'use strict';
-const APP_VER = '2.16.5';
+const APP_VER = '2.16.6';
 const ACTS = {
   paste:      { ic:'📋', name:'貼上原圖',   desc:'直接貼進電腦正在用的軟體' },
   straighten: { ic:'📄', name:'拉正後貼上', desc:'考卷、講義、課本拍歪了' },
@@ -1087,7 +1087,11 @@ async function sendVoice(text, mode){
     await postToPc({ type: 'voice_text', id: v.id, text, mode, autoEnter: mode === 'enter', timestamp: Date.now() });
     ding(); vibrate(30);
     if (fromBox && $('chk-clear').checked) ta.value = '';
-    if (pcLegacy) { setVJob(v, 'ok', '✓ 已送到電腦'); return; }
+    if (pcLegacy) {
+      if (mode === 'en' || mode === 'clip') setVJob(v, 'warn', '⚠️ 電腦上的汪汪是舊版，不認得「' + VMODES[mode].slice(2).trim() + '」，已直接打原文。請更新汪汪小精靈');
+      else setVJob(v, 'ok', '✓ 已送到電腦');
+      return;
+    }
     setVJob(v, 'wait', '已送出，等電腦回報…');
     catchUpWhile(() => v.state === 'wait');
     setTimeout(() => {
