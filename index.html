@@ -112,6 +112,10 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 .keys button{padding:13px 4px;border-radius:12px;background:#2d3436;color:#fff;font-size:15px;font-weight:800}
 .keys button:active{background:var(--blue)}
 #vjobs{list-style:none;margin:0;padding:0}
+.tools{display:flex;gap:6px;margin-top:8px}
+.tools button{flex:1;padding:9px 4px;border-radius:10px;background:#e8f8f1;color:#0b8a5f;font-weight:800;font-size:14px;border:1px solid #b8ead3}
+.autoclean{display:flex;gap:6px;align-items:flex-start;margin-top:8px;font-size:13px;color:var(--sub);line-height:1.45;font-weight:700}
+.autoclean input{margin-top:2px;flex:none}
 .vjob{padding:9px 0;border-top:1px solid var(--line)}
 .vjob:first-child{border-top:0}
 .vjob .tx{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -195,6 +199,13 @@ main{padding:0 12px calc(24px + var(--safe-b))}
       <button id="voice-send" onclick="sendVoice()"><span class="e">🚀</span>傳送</button>
     </div>
     <div class="puncts" id="puncts"></div>
+    <div class="tools">
+      <button onclick="tidy('clean')">✨ 整理</button>
+      <button onclick="tidy('bullet')">• 條列</button>
+      <button onclick="tidy('number')">1. 編號</button>
+      <button id="btn-undo-tidy" class="hidden" onclick="undoTidy()">↶ 還原</button>
+    </div>
+    <label class="autoclean"><input type="checkbox" id="chk-autoclean"> 送出前自動整理：去掉「嗯、呃、那個那個」，聽懂「換行、句號、逗號、問號、刪掉上一句」</label>
     <div id="voice-status"></div>
     <div class="label" style="margin-top:14px">🎮 遙控電腦（按了直接在電腦上按這個鍵）</div>
     <div class="keys" id="keys">
@@ -285,7 +296,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 
 <script>
 'use strict';
-const APP_VER = '2.16.1';
+const APP_VER = '2.16.2';
 const ACTS = {
   paste:      { ic:'📋', name:'貼上原圖',   desc:'直接貼進電腦正在用的軟體' },
   straighten: { ic:'📄', name:'拉正後貼上', desc:'考卷、講義、課本拍歪了' },
@@ -342,6 +353,8 @@ window.addEventListener('DOMContentLoaded', () => {
   setFont(LS.get('puppy_font', 18));
   $('chk-clear').checked = LS.get('puppy_clear', true) !== false;
   $('chk-clear').onchange = e => LS.set('puppy_clear', e.target.checked);
+  $('chk-autoclean').checked = LS.get('puppy_autoclean', true) !== false;
+  $('chk-autoclean').onchange = e => LS.set('puppy_autoclean', e.target.checked);
   document.querySelectorAll('#vmodes button').forEach(b => b.onclick = () => setVMode(b.dataset.m));
   setVMode(LS.get('puppy_vmode', LS.get('puppy_enter', false) ? 'enter' : 'type'));
   document.querySelectorAll('#keys button').forEach(b => b.onclick = () => sendKey(b.dataset.k, b.textContent.trim()));
@@ -834,6 +847,97 @@ function insertText(ch){
   ta.value = ta.value.slice(0, s) + ch + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + ch.length; ta.focus();
 }
 function setFont(v){ $('voice-text').style.fontSize = v + 'px'; $('font-range').value = v; LS.set('puppy_font', +v); }
+/* ── 語音文字整理（全部在手機上做，不上網）── */
+const CJK = '\\u3400-\\u9fff\\uf900-\\ufaff';
+const SPOKEN = [   // 口令 → 符號（只有「單獨說出來」的口令才轉，避免把正常句子裡的字換掉）
+  [/(?:空一行)/g, '\n\n'],
+  [/(?:換行|下一行|新的一行|換一行)/g, '\n'],
+  [/(?:句號|句點)/g, '。'], [/(?:逗號|逗點)/g, '，'], [/頓號/g, '、'],
+  [/問號/g, '？'], [/(?:驚嘆號|感嘆號|驚歎號)/g, '！'], [/冒號/g, '：'], [/分號/g, '；'],
+  [/(?:上引號|引號開始|開引號)/g, '「'], [/(?:下引號|引號結束|關引號)/g, '」'],
+  [/(?:左括號|括號開始)/g, '（'], [/(?:右括號|括號結束)/g, '）'],
+];
+const DEL_LAST = /(?:刪掉|刪除|去掉)(?:上一句|前一句|剛剛那句|剛才那句)|剛剛那句不要|剛才那句不要/;
+
+function applySpokenCommands(t){
+  // 口令前後若緊貼著標點或空白／開頭結尾，才當成口令
+  for (const [re, sym] of SPOKEN) {
+    t = t.replace(new RegExp('(^|[\\s，。、？！,.?!；：])\\s*(' + re.source + ')\\s*(?=$|[\\s，。、？！,.?!；：])', 'g'),
+                  (m, pre) => (/[，。、？！,.?!；：]/.test(pre) && sym !== '\n' && sym !== '\n\n' && sym !== '「' && sym !== '（' ? '' : pre) + sym);
+  }
+  // 「刪掉上一句」：把它前面的那一句拿掉
+  let guard = 0;
+  while (DEL_LAST.test(t) && guard++ < 10) {
+    const m = t.match(DEL_LAST);
+    let before = t.slice(0, m.index).replace(/[\s，,]+$/, '');
+    const after = t.slice(m.index + m[0].length).replace(/^[\s，,。.！!？?]+/, '');
+    const body = before.replace(/[。！？!?.\n]+$/, '');
+    const cut = Math.max(body.lastIndexOf('。'), body.lastIndexOf('！'), body.lastIndexOf('？'), body.lastIndexOf('\n'),
+                         body.lastIndexOf('!'), body.lastIndexOf('?'));
+    before = cut >= 0 ? body.slice(0, cut + 1) : '';
+    t = before + after;
+  }
+  return t;
+}
+
+function removeFillers(t){
+  // 口頭的「嗯、呃、欸」：單獨出現（前後是標點、空白或開頭）就拿掉
+  t = t.replace(new RegExp('(^|[\\s，。、？！,.?!；：])(?:嗯+|呃+|欸+|唔+|額+|恩+)(?=[\\s，。、？！,.?!；：]|$)', 'g'), '$1');
+  // 句首的「那個、然後、就是」接逗號
+  t = t.replace(/(^|[。！？!?\n]\s*)(?:那個|然後|就是|所以說)[，,、\s]+/g, '$1');
+  // 重複的口頭禪：那個那個、然後然後、就是就是、這個這個、對對對
+  t = t.replace(/(那個|然後|就是|這個|所以|對)(?:[，,、\s]*\1)+/g, '$1');
+  // 夾在兩個逗號中間的「那個、就是、然後」
+  t = t.replace(/[，,、]\s*(?:那個|就是|然後|這個)\s*[，,、]/g, '，');
+  // 英文 um / uh / er
+  t = t.replace(/\b(?:um+|uh+|erm*|hmm+)\b[,，]?\s*/gi, '');
+  return t;
+}
+
+function fixPunct(t){
+  // 中文旁邊的半形標點改全形
+  const map = { ',': '，', '.': '。', '?': '？', '!': '！', ':': '：', ';': '；' };
+  t = t.replace(new RegExp('([' + CJK + '])\\s*([,.?!:;])(?!\\d)', 'g'), (m, a, p) => a + map[p]);
+  t = t.replace(new RegExp('([,?!:;])\\s*(?=[' + CJK + '])', 'g'), (m, p) => map[p]);
+  // 中文字之間多出來的空白
+  t = t.replace(new RegExp('([' + CJK + '，。、？！；：「」（）])[ \\t]+(?=[' + CJK + '，。、？！；：「」（）])', 'g'), '$1');
+  // 重複或打架的標點：，，→，  ，。→。
+  t = t.replace(/([，、；：])\1+/g, '$1').replace(/[，、]+([。？！；：」）])/g, '$1').replace(/([。？！])[，、]+/g, '$1');
+  t = t.replace(/^[，、。；：\s]+/, '').replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n');
+  return t.trim();
+}
+
+function cleanText(t, opt){
+  opt = opt || {};
+  let s = String(t || '');
+  if (opt.commands !== false) s = applySpokenCommands(s);
+  if (opt.fillers !== false) s = removeFillers(s);
+  return fixPunct(s);
+}
+
+function toList(t, numbered){
+  const items = String(t || '').split(/[\n。；;]+|(?<=[！？!?])/).map(x => x.replace(/^\s*(?:[•\-–\*]|\d+[.、)]|[一二三四五六七八九十]+[、.])\s*/, '').replace(/[，,、\s]+$/, '').trim()).filter(Boolean);
+  return items.map((x, i) => (numbered ? (i + 1) + '. ' : '• ') + x).join('\n');
+}
+
+
+let tidyPrev = null;
+function tidy(kind){
+  const ta = $('voice-text'), before = ta.value;
+  if (!before.trim()) { toast('輸入框是空的'); return; }
+  const cleaned = cleanText(before);
+  const after = kind === 'clean' ? cleaned : toList(cleaned, kind === 'number');
+  if (after === before) { toast('已經很整齊了 👍'); return; }
+  tidyPrev = before; ta.value = after;
+  $('btn-undo-tidy').classList.remove('hidden');
+  vibrate(15);
+}
+function undoTidy(){
+  if (tidyPrev === null) return;
+  $('voice-text').value = tidyPrev; tidyPrev = null;
+  $('btn-undo-tidy').classList.add('hidden');
+}
+
 /* 語音打字：送出方式、回報、最近紀錄、遙控鍵 */
 const VMODES = { type: '⌨️ 直接打字', enter: '⏎ 打完按 Enter', clip: '📋 只放剪貼簿', en: '🌐 翻成英文' };
 let vmode = 'type';
@@ -855,7 +959,9 @@ async function sendVoice(text, mode){
   const ta = $('voice-text');
   const fromBox = text === undefined;
   text = (fromBox ? ta.value : text).trim(); mode = mode || vmode;
+  if (fromBox && text && $('chk-autoclean').checked) text = cleanText(text);
   if (!text) { toast('請先說話或打字'); return; }
+  if (fromBox) { tidyPrev = null; $('btn-undo-tidy').classList.add('hidden'); }
   const v = { id: newId(), text, mode, state: 'wait', msg: '傳送中…' };
   vjobs.unshift(v); vjobs.splice(15); renderVJobs();
   vStatus('傳送中…');
