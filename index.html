@@ -114,8 +114,22 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 #vjobs{list-style:none;margin:0;padding:0}
 .tools{display:flex;gap:6px;margin-top:8px}
 .tools button{flex:1;padding:9px 4px;border-radius:10px;background:#e8f8f1;color:#0b8a5f;font-weight:800;font-size:14px;border:1px solid #b8ead3}
-.autoclean{display:flex;gap:6px;align-items:flex-start;margin-top:8px;font-size:13px;color:var(--sub);line-height:1.45;font-weight:700}
-.autoclean input{margin-top:2px;flex:none}
+.vopts{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:14px;font-weight:800;color:var(--sub)}
+.vopts label{display:flex;align-items:center;gap:5px}
+.vright{margin-top:14px}
+/* 平板（iPad 等寬螢幕）：左右兩欄，右邊的遙控鍵與紀錄不會被鍵盤擋住 */
+@media (min-width: 700px){
+  main{max-width:1180px;margin:0 auto}
+  .tabs{max-width:1180px;margin:0 auto}
+  .vgrid{display:grid;grid-template-columns:1.25fr 1fr;gap:18px;align-items:start}
+  .vright{margin-top:0;position:sticky;top:64px}
+  #voice-text{min-height:190px}
+  .keys button{padding:16px 4px;font-size:16px}
+}
+/* 手機打字中：收起標題列，讓輸入框、狀態、標點留在鍵盤上方 */
+body.typing header{display:none}
+body.typing .tabs{display:none}
+@media (max-width: 699px){ body.typing #panel-voice .vleft > .label{display:none} body.typing .vmodes{margin-bottom:6px} }
 .vjob{padding:9px 0;border-top:1px solid var(--line)}
 .vjob:first-child{border-top:0}
 .vjob .tx{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -188,6 +202,8 @@ main{padding:0 12px calc(24px + var(--safe-b))}
   </section>
 
   <section class="panel" id="panel-voice">
+   <div class="vgrid">
+    <div class="vleft">
     <div class="label">送出後怎麼放到電腦？</div>
     <div class="vmodes" id="vmodes">
       <button data-m="type">⌨️ 直接打字</button>
@@ -199,6 +215,11 @@ main{padding:0 12px calc(24px + var(--safe-b))}
       <textarea id="voice-text" placeholder="點這裡，再按鍵盤上的麥克風開始說話…"></textarea>
       <button id="voice-send" onclick="sendVoice()"><span class="e">🚀</span>傳送</button>
     </div>
+    <div id="voice-status"></div>
+    <div class="vopts">
+      <label><input type="checkbox" id="chk-clear" checked> 傳送後清空</label>
+      <label title="去掉「嗯、呃、那個那個」，聽懂「換行、句號、逗號、問號、刪掉上一句」"><input type="checkbox" id="chk-autoclean"> 送出前自動整理</label>
+    </div>
     <div class="puncts" id="puncts"></div>
     <div class="tools">
       <button onclick="tidy('clean')">✨ 整理</button>
@@ -206,9 +227,10 @@ main{padding:0 12px calc(24px + var(--safe-b))}
       <button onclick="tidy('number')">1. 編號</button>
       <button id="btn-undo-tidy" class="hidden" onclick="undoTidy()">↶ 還原</button>
     </div>
-    <label class="autoclean"><input type="checkbox" id="chk-autoclean"> 送出前自動整理：去掉「嗯、呃、那個那個」，聽懂「換行、句號、逗號、問號、刪掉上一句」</label>
-    <div id="voice-status"></div>
-    <div class="label" style="margin-top:14px">🎮 遙控電腦（按了直接在電腦上按這個鍵）</div>
+    <div class="small" style="margin-top:6px">自動整理會去掉「嗯、呃、那個那個」，也聽得懂「換行、句號、逗號、問號、刪掉上一句」。</div>
+    </div>
+    <div class="vright">
+    <div class="label">🎮 遙控電腦（按了直接在電腦上按這個鍵）</div>
     <div class="keys" id="keys">
       <button data-k="undo">↩︎ 撤銷</button>
       <button data-k="backspace">⌫ 刪字</button>
@@ -217,16 +239,16 @@ main{padding:0 12px calc(24px + var(--safe-b))}
       <button data-k="pgup">◀ 上一頁</button>
       <button data-k="pgdn">下一頁 ▶</button>
     </div>
-    <div class="vtop" style="margin-top:12px">
-      <label><input type="checkbox" id="chk-clear" checked> 傳送後清空</label>
-      <label>字體 <input type="range" id="font-range" min="14" max="32" value="18" oninput="setFont(this.value)" style="width:90px"></label>
+    <div class="hidden" id="vjobs-card">
+      <div class="label" style="display:flex;justify-content:space-between;margin-top:14px"><span>🕘 最近送出的文字</span><span class="small">點一下可再送一次</span></div>
+      <ul id="vjobs"></ul>
     </div>
+    <div class="vtop" style="margin-top:12px">
+      <label>字體 <input type="range" id="font-range" min="14" max="32" value="18" oninput="setFont(this.value)" style="width:110px"></label>
+    </div>
+    </div>
+   </div>
   </section>
-
-  <div class="card hidden" id="vjobs-card">
-    <div class="label" style="display:flex;justify-content:space-between"><span>🕘 最近送出的文字</span><span class="small">點一下可再送一次</span></div>
-    <ul id="vjobs"></ul>
-  </div>
 
   <div id="pair" class="card hidden">
     <h2>👋 第一次使用：先跟電腦配對</h2>
@@ -299,7 +321,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 
 <script>
 'use strict';
-const APP_VER = '2.16.4';
+const APP_VER = '2.16.5';
 const ACTS = {
   paste:      { ic:'📋', name:'貼上原圖',   desc:'直接貼進電腦正在用的軟體' },
   straighten: { ic:'📄', name:'拉正後貼上', desc:'考卷、講義、課本拍歪了' },
@@ -358,6 +380,14 @@ window.addEventListener('DOMContentLoaded', () => {
   $('chk-clear').onchange = e => LS.set('puppy_clear', e.target.checked);
   $('chk-autoclean').checked = LS.get('puppy_autoclean', true) !== false;
   $('chk-autoclean').onchange = e => LS.set('puppy_autoclean', e.target.checked);
+  // v2.16.5：「傳送後清空」重設成預設打開一次（之前測試時可能被關掉）
+  if (!LS.get('puppy_clear_reset_2165', false)) { LS.set('puppy_clear', true); LS.set('puppy_clear_reset_2165', true); $('chk-clear').checked = true; }
+  const ta = $('voice-text');
+  ta.addEventListener('focus', () => {
+    if (window.innerWidth < 700) document.body.classList.add('typing');
+    setTimeout(() => ta.scrollIntoView({ block: 'start', behavior: 'smooth' }), 320);
+  });
+  ta.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== ta) document.body.classList.remove('typing'); }, 150));
   document.querySelectorAll('#vmodes button').forEach(b => b.onclick = () => setVMode(b.dataset.m));
   setVMode(LS.get('puppy_vmode', LS.get('puppy_enter', false) ? 'enter' : 'type'));
   document.querySelectorAll('#keys button').forEach(b => b.onclick = () => sendKey(b.dataset.k, b.textContent.trim()));
@@ -383,12 +413,16 @@ window.addEventListener('DOMContentLoaded', () => {
   renderJobs();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 });
+function recheckOnReturn(){
+  if (!room) return;
+  if (!sse || sse.readyState === 2) startCfg();
+  // 從背景回來（關螢幕、切 App）超過 20 秒：先別相信舊的「已連上」，重新確認
+  if (Date.now() - lastPcSeen > 20000) { if (pcState === 'ok') setPc('wait', '確認連線中…'); sayHello(); }
+}
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && room) {
-    if (Date.now() - lastPcSeen > 25000) sayHello();
-    if (!sse || sse.readyState === 2) startCfg();
-  }
+  if (document.visibilityState === 'visible') recheckOnReturn(); else hiddenAt = Date.now();
 });
+window.addEventListener('pageshow', e => { if (e.persisted) recheckOnReturn(); });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
 window.addEventListener('appinstalled', () => { $('install').classList.add('hidden'); toast('✓ 已加到主畫面'); });
 
@@ -420,13 +454,29 @@ function setAct(a, quiet){
 }
 
 /* ── 連線狀態 ── */
-function setPc(state, text){
+let badReason = '';
+function setPc(state, text, reason){
   pcState = state;
   const pill = $('pc-pill'); pill.className = state;
   $('pc-pill-txt').textContent = text;
   const showAlert = state === 'bad';
   $('alert').classList.toggle('hidden', !showAlert);
-  if (showAlert) $('alert-body').textContent = '目前選的是「' + roomName(room) + '」（配對碼 ' + room + '）。';
+  if (!showAlert) return;
+  badReason = reason || 'noreply';
+  const where = '目前選的是「' + roomName(room) + '」（配對碼 ' + room + '）。';
+  if (badReason === 'ratelimit') {
+    $('alert-title').textContent = '⏳ 傳訊服務暫時太忙';
+    $('alert-body').textContent = '同一個網路一下子傳太多訊息，被暫時限流了。不用重新配對，大約 1～2 分鐘後會自動恢復。';
+    $('alert').querySelector('ol').style.display = 'none';
+  } else if (badReason === 'offline') {
+    $('alert-title').textContent = '💤 電腦上的汪汪小精靈已關閉';
+    $('alert-body').textContent = where + '請在電腦上打開汪汪小精靈，手機就會自動連回來。';
+    $('alert').querySelector('ol').style.display = 'none';
+  } else {
+    $('alert-title').textContent = '⚠️ 連不到電腦';
+    $('alert-body').textContent = where;
+    $('alert').querySelector('ol').style.display = '';
+  }
 }
 function showPair(){
   $('pair').classList.remove('hidden');
@@ -439,11 +489,15 @@ function connect(){
   setPc('wait', '連線中…' + roomName(room));
   startCfg();
   startPeer();
-  sayHello();
+  // 等「收電腦回覆」的長連線接好再打招呼，免得電腦回得太快、手機漏接（最多等 2 秒）
+  let said = false;
+  const go = () => { if (!said) { said = true; sayHello(true); } };
+  if (sse) sse.addEventListener('open', go, { once: true });
+  setTimeout(go, 2000);
 }
 function retryConnect(){ setPc('wait', '再試一次…'); triedOthers = false; connect(); }
 function pcAlive(info){
-  lastPcSeen = Date.now();
+  lastPcSeen = Date.now(); badReason = '';
   clearTimeout(helloTimer);
   const r = rooms.find(x => x.code === room); if (r) { r.last = Date.now(); saveRooms(); }
   if (pcState !== 'ok') {
@@ -452,20 +506,41 @@ function pcAlive(info){
   }
 }
 let triedOthers = false;
-function sayHello(){
+function sayHello(first){
   if (!room) return;
   helloId = newId();
-  const body = JSON.stringify({ type: 'hello', id: helloId, tab: curTab, v: APP_VER });
-  fetch(NTFY + 'puppysprite_direct_' + room, { method: 'POST', body }).catch(() => {});
+  const body = JSON.stringify({ type: 'hello', id: helloId, tab: curTab, v: APP_VER, first: !!first });
+  lastHelloAt = Date.now();
+  fetch(NTFY + 'puppysprite_direct_' + room, { method: 'POST', body }).then(r => {
+    if (r.status === 429) { clearTimeout(helloTimer); setPc('bad', '傳訊服務忙碌中', 'ratelimit'); helloTimer = setTimeout(sayHello, 70000); }
+  }).catch(() => {});
   try { if (conn && conn.open) conn.send({ type: 'hello', id: helloId }); } catch (e) {}
   clearTimeout(helloTimer);
+  const myHello = helloId, code0 = room;
+  setTimeout(() => {   // 4 秒還沒聽到回覆：補查一次最近的訊息（只查一次）
+    if (helloId !== myHello || Date.now() - lastPcSeen < 6000 || code0 !== room) return;
+    fetch(NTFY + 'puppysprite_cfg_' + code0 + '/json?poll=1&since=20s').then(r => r.status === 429 ? '' : r.text()).then(t => (t || '').split('\n').forEach(l => {
+      try { const o = JSON.parse(l); if (o.event === 'message' && o.message) onPcMsg(JSON.parse(o.message), o.time, code0); } catch (e) {}
+    })).catch(() => {});
+  }, 4000);
   helloTimer = setTimeout(() => {
     if (Date.now() - lastPcSeen < 12000) return;
     if (!triedOthers && rooms.length > 1) { triedOthers = true; tryOtherRooms(); return; }
+    if (badReason === 'ratelimit' && pcState === 'bad') return;
     setPc('bad', '連不到：' + roomName(room));
     vibrate([60, 60, 60]);
   }, 10000);
 }
+// v2.16.5：網頁開著時每 45 秒確認一次電腦還在（只問一則小訊息，很省）
+let lastHelloAt = 0, hiddenAt = 0;
+setInterval(() => {
+  if (!room || document.visibilityState !== 'visible') return;
+  if (pcState === 'bad' && badReason === 'ratelimit') return;
+  // 連不到時每 15 秒再問一次（電腦可能正在開機）；連上以後每 45 秒確認一次
+  const gap = (pcState === 'bad' || pcState === 'wait') ? 12000 : 40000;
+  if (Date.now() - lastHelloAt < gap) return;
+  sayHello();
+}, 15000);
 // 目前這台沒回應：問問其他配對過的電腦，誰在線上就自動切過去
 async function tryOtherRooms(){
   setPc('wait', '找其他電腦中…');
@@ -495,19 +570,42 @@ function startCfg(){
     sse = new EventSource(NTFY + 'puppysprite_cfg_' + code + '/sse');
     sse.onmessage = ev => { try { const o = JSON.parse(ev.data); if (o.event === 'message' && o.message) onPcMsg(JSON.parse(o.message), o.time, code); } catch (e) {} };
   } catch (e) {}
-  // 備援：有些網路擋 SSE，就每 5 秒問一次
+  // 備援：只有長連線（SSE）斷掉時才偶爾查一次（v2.16.5：原本每 5 秒查，太多會被 ntfy.sh 限流）
   pollTimer = setInterval(() => {
     if (document.visibilityState !== 'visible') return;
-    if (sse && sse.readyState === 1 && Date.now() - lastPcSeen < 60000) return;
-    fetch(NTFY + 'puppysprite_cfg_' + code + '/json?poll=1&since=10s').then(r => r.text()).then(t => t.split('\n').forEach(l => {
+    if (sse && sse.readyState !== 2) return;          // 長連線還在（或正在自動重連）就不用查
+    fetch(NTFY + 'puppysprite_cfg_' + code + '/json?poll=1&since=30s').then(r => {
+      if (r.status === 429) { setPc('bad', '傳訊服務忙碌中', 'ratelimit'); return ''; }
+      if (!sse || sse.readyState === 2) startCfg();
+      return r.text();
+    }).then(t => (t || '').split('\n').forEach(l => {
       try { const o = JSON.parse(l); if (o.event === 'message' && o.message) onPcMsg(JSON.parse(o.message), o.time, code); } catch (e) {}
     })).catch(() => {});
-  }, 5000);
+  }, 30000);
 }
+// 有東西在等電腦回報時，補查一次最近的訊息（長連線偶爾斷一下時，回報才不會漏掉）
+let lastCatch = 0;
+function catchUp(){
+  if (!room || Date.now() - lastCatch < 3500) return;
+  lastCatch = Date.now();
+  const code = room;
+  fetch(NTFY + 'puppysprite_cfg_' + code + '/json?poll=1&since=60s').then(r => r.status === 429 ? '' : r.text()).then(t => (t || '').split('\n').forEach(l => {
+    try { const o = JSON.parse(l); if (o.event === 'message' && o.message) onPcMsg(JSON.parse(o.message), o.time, code); } catch (e) {}
+  })).catch(() => {});
+  if (!sse || sse.readyState === 2) startCfg();
+}
+function catchUpWhile(still){ [5000, 10000].forEach(ms => setTimeout(() => { if (still()) catchUp(); }, ms)); }
+
 function onPcMsg(m, timeSec, code){
   if (!m || typeof m !== 'object' || code !== room) return;
   if (!m.ts && timeSec) m.ts = timeSec * 1000;
   if (m.type === 'receipt') { pcAlive(); onReceipt(m); return; }
+  if (m.type === 'pc_offline') {
+    if (m.ts && m.ts < Date.now() - 600000) return;
+    lastPcSeen = 0; conn = null;
+    setPc('bad', '電腦已關閉：' + roomName(room), 'offline');
+    return;
+  }
   if (m.type === 'set_resolution' || m.type === 'switch_tab' || m.maxW) {
     if (m.ts && m.ts < Date.now() - 60000) return;
     if (m.pc === 'online' || (m.ts && m.ts > Date.now() - 20000)) {
@@ -651,6 +749,7 @@ function afterSent(j){
   j.sentAt = Date.now();
   if (pcLegacy) { setJob(j, 'ok', '✓ 已送到電腦'); return; }
   if (j.state === 'send' || j.state === 'prep') setJob(j, 'wait', '已送出，等電腦回報…', 100);
+  catchUpWhile(() => j.state === 'wait' || j.state === 'got');
   setTimeout(() => {
     if (j.state === 'wait') {
       setJob(j, 'err', '⚠️ 電腦沒有回應（點一下重傳）');
@@ -990,13 +1089,14 @@ async function sendVoice(text, mode){
     if (fromBox && $('chk-clear').checked) ta.value = '';
     if (pcLegacy) { setVJob(v, 'ok', '✓ 已送到電腦'); return; }
     setVJob(v, 'wait', '已送出，等電腦回報…');
+    catchUpWhile(() => v.state === 'wait');
     setTimeout(() => {
       if (v.state !== 'wait') return;
       setVJob(v, 'err', '⚠️ 電腦沒有回應（點一下再送）');
       if (Date.now() - lastPcSeen > 20000) { setPc('bad', '連不到：' + roomName(room)); vibrate([60, 60, 60]); } else sayHello();
     }, 15000);
   } catch (e) {
-    setVJob(v, 'err', '⚠️ 沒送出去，請檢查網路（點一下再送）');
+    setVJob(v, 'err', String(e && e.message) === '429' ? '⏳ 傳訊服務暫時太忙，約 1～2 分鐘後再送（點一下再送）' : '⚠️ 沒送出去，請檢查網路（點一下再送）');
   }
 }
 function setVJob(v, state, msg){
@@ -1042,7 +1142,10 @@ async function sendKey(k, label){
   try {
     await postToPc({ type: 'key', id, key: k });
     if (pcLegacy) vStatus('⚠️ 電腦端是舊版，還不支援遙控鍵，請更新汪汪小精靈', 'warn');
-    else setTimeout(() => { if (keyJobs[id]) { delete keyJobs[id]; vStatus('⚠️ 電腦沒有回應「' + label + '」', 'err'); } }, 12000);
+    else {
+      catchUpWhile(() => keyJobs[id] !== undefined);
+      setTimeout(() => { if (keyJobs[id]) { delete keyJobs[id]; vStatus('⚠️ 電腦沒有回應「' + label + '」', 'err'); } }, 12000);
+    }
   } catch (e) { vStatus('⚠️ 沒送出去，請檢查網路', 'err'); }
 }
 function onTextReceipt(m){
