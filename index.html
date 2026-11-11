@@ -862,7 +862,7 @@ const DEL_LAST = /(?:刪掉|刪除|去掉)(?:上一句|前一句|剛剛那句|�
 function applySpokenCommands(t){
   // 口令前後若緊貼著標點或空白／開頭結尾，才當成口令
   for (const [re, sym] of SPOKEN) {
-    t = t.replace(new RegExp('(^|[\\s，。、？！,.?!；：])\\s*(' + re.source + ')\\s*(?=$|[\\s，。、？！,.?!；：])', 'g'),
+    t = t.replace(new RegExp('(^|[\\s，。、？！,.?!；：])[ \\t]*(' + re.source + ')[ \\t]*(?=$|[\\s，。、？！,.?!；：])', 'g'),
                   (m, pre) => (/[，。、？！,.?!；：]/.test(pre) && sym !== '\n' && sym !== '\n\n' && sym !== '「' && sym !== '（' ? '' : pre) + sym);
   }
   // 「刪掉上一句」：把它前面的那一句拿掉
