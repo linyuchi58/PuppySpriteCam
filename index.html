@@ -137,6 +137,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 #toast{position:fixed;left:50%;bottom:calc(24px + var(--safe-b));transform:translateX(-50%);background:#1e272ee6;color:#fff;padding:11px 16px;border-radius:12px;font-weight:700;font-size:15px;z-index:80;max-width:90vw;text-align:center;display:none}
 #install{margin-top:12px;background:#eaf4ff;border:2px solid #74b9ff;border-radius:16px;padding:12px 14px}
 #install b{font-size:15px}
+.install-link{display:block;margin:16px auto 0;background:none;color:var(--blue);font-weight:800;font-size:15px;padding:10px;text-decoration:underline}
 #install p{margin:6px 0 10px;font-size:14px;color:#2d3436;line-height:1.6}
 </style>
 </head>
@@ -251,6 +252,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
     <ul id="jobs"></ul>
     <div class="empty" id="jobs-empty">還沒有傳過照片</div>
   </div>
+  <button class="install-link hidden" id="install-link" onclick="showInstallNow()">📌 把「汪汪快拍」加到手機主畫面</button>
 </main>
 
 <!-- 掃碼 -->
@@ -278,6 +280,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
       <button class="btn blue" onclick="closeSheet('pc-sheet');startScan()">📷 掃碼加入／重新配對</button>
     </div>
     <p class="small" style="margin-top:12px">每台電腦有自己的配對碼（家裡、學校各掃一次就好）。連不上時，手機會自動試試其他配對過的電腦。</p>
+    <button class="btn hidden" id="install-sheet-btn" style="width:100%;margin-top:4px" onclick="showInstallNow()">📌 加到手機主畫面</button>
     <p class="small" id="ver-line"></p>
   </div>
 </div>
@@ -296,7 +299,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 
 <script>
 'use strict';
-const APP_VER = '2.16.2';
+const APP_VER = '2.16.3';
 const ACTS = {
   paste:      { ic:'📋', name:'貼上原圖',   desc:'直接貼進電腦正在用的軟體' },
   straighten: { ic:'📄', name:'拉正後貼上', desc:'考卷、講義、課本拍歪了' },
@@ -361,6 +364,7 @@ window.addEventListener('DOMContentLoaded', () => {
   vjobs.push(...LS.get('puppy_vhist', []).map(v => Object.assign(v, { state: 'old' })));
   renderVJobs();
   $('ver-line').textContent = '汪汪快拍 v' + APP_VER;
+  if (!isStandalone()) { $('install-link').classList.remove('hidden'); $('install-sheet-btn').classList.remove('hidden'); }
 
   const p = new URLSearchParams(location.search);
   const urlRoom = cleanCode(p.get('room') || location.hash.replace('#', ''));
@@ -386,7 +390,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
-window.addEventListener('appinstalled', () => { hideInstall(); toast('✓ 已加到主畫面'); });
+window.addEventListener('appinstalled', () => { $('install').classList.add('hidden'); toast('✓ 已加到主畫面'); });
 
 function addRoom(code){
   if (!rooms.some(r => r.code === code)) {
@@ -818,8 +822,9 @@ async function decodeQrPhoto(input){
 }
 
 /* ── 加到主畫面 ── */
-function maybeShowInstall(){
-  if (isStandalone() || LS.get('puppy_install_hide', 0) > Date.now()) return;
+function maybeShowInstall(force){
+  if (isStandalone()) return;
+  if (!force && LS.get('puppy_install_hide', 0) > Date.now()) return;
   $('install-text').innerHTML = isIOS
     ? '按 Safari 下方的「分享」<b>⎙</b>，往下找「<b>加入主畫面</b>」。以後點桌面的狗狗相機圖示，直接就能拍，不用再掃 QR Code。'
     : (installEvt ? '按下面的按鈕，手機桌面會多一個狗狗相機圖示，以後一點就能拍，不用再掃 QR Code。'
@@ -828,7 +833,13 @@ function maybeShowInstall(){
   $('install').classList.remove('hidden');
 }
 async function doInstall(){ if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; hideInstall(); }
-function hideInstall(){ $('install').classList.add('hidden'); LS.set('puppy_install_hide', Date.now() + 7 * 864e5); }
+function hideInstall(){ $('install').classList.add('hidden'); LS.set('puppy_install_hide', Date.now() + 2 * 864e5); }
+function showInstallNow(){
+  closeSheet('pc-sheet');
+  maybeShowInstall(true);
+  if (installEvt) { doInstall(); return; }          // Android Chrome：直接跳出安裝視窗
+  setTimeout(() => $('install').scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+}
 
 /* ── 語音打字 ── */
 function buildPuncts(){
