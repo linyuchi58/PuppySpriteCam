@@ -103,7 +103,20 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 #voice-send .e{font-size:28px}
 .puncts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .puncts button{min-width:42px;padding:9px 10px;border-radius:10px;background:#eef2f7;font-size:18px;font-weight:700;color:var(--ink)}
-#voice-status{margin-top:10px;font-size:14px;font-weight:700;color:var(--sub);min-height:20px}
+#voice-status{margin-top:10px;font-size:14px;font-weight:700;color:var(--sub);min-height:20px;line-height:1.4}
+#voice-status.ok{color:#0b8a5f} #voice-status.warn{color:#c77700} #voice-status.err{color:var(--red)}
+.vmodes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.vmodes button{padding:9px 2px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:13px;font-weight:800;color:var(--ink)}
+.vmodes button.on{border-color:var(--blue);background:#eaf4ff;color:var(--blue)}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.keys button{padding:13px 4px;border-radius:12px;background:#2d3436;color:#fff;font-size:15px;font-weight:800}
+.keys button:active{background:var(--blue)}
+#vjobs{list-style:none;margin:0;padding:0}
+.vjob{padding:9px 0;border-top:1px solid var(--line)}
+.vjob:first-child{border-top:0}
+.vjob .tx{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vjob .st{font-size:13px;color:var(--sub);margin-top:2px}
+.vjob.ok .st{color:#0b8a5f} .vjob.warn .st{color:#c77700} .vjob.err .st{color:var(--red)}
 
 /* 底部抽屜 */
 .sheet-bg{position:fixed;inset:0;background:#0007;z-index:50;display:flex;align-items:flex-end}
@@ -170,10 +183,12 @@ main{padding:0 12px calc(24px + var(--safe-b))}
   </section>
 
   <section class="panel" id="panel-voice">
-    <div class="vtop">
-      <label><input type="checkbox" id="chk-clear" checked> 傳送後清空</label>
-      <label><input type="checkbox" id="chk-enter"> 貼上後按 Enter</label>
-      <label>字體 <input type="range" id="font-range" min="14" max="32" value="18" oninput="setFont(this.value)" style="width:90px"></label>
+    <div class="label">送出後怎麼放到電腦？</div>
+    <div class="vmodes" id="vmodes">
+      <button data-m="type">⌨️ 直接打字</button>
+      <button data-m="enter">⏎ 打完按 Enter</button>
+      <button data-m="clip">📋 只放剪貼簿</button>
+      <button data-m="en">🌐 翻成英文</button>
     </div>
     <div class="vrow">
       <textarea id="voice-text" placeholder="點這裡，再按鍵盤上的麥克風開始說話…"></textarea>
@@ -181,7 +196,25 @@ main{padding:0 12px calc(24px + var(--safe-b))}
     </div>
     <div class="puncts" id="puncts"></div>
     <div id="voice-status"></div>
+    <div class="label" style="margin-top:14px">🎮 遙控電腦（按了直接在電腦上按這個鍵）</div>
+    <div class="keys" id="keys">
+      <button data-k="undo">↩︎ 撤銷</button>
+      <button data-k="backspace">⌫ 刪字</button>
+      <button data-k="enter">⏎ Enter</button>
+      <button data-k="tab">⇥ Tab</button>
+      <button data-k="pgup">◀ 上一頁</button>
+      <button data-k="pgdn">下一頁 ▶</button>
+    </div>
+    <div class="vtop" style="margin-top:12px">
+      <label><input type="checkbox" id="chk-clear" checked> 傳送後清空</label>
+      <label>字體 <input type="range" id="font-range" min="14" max="32" value="18" oninput="setFont(this.value)" style="width:90px"></label>
+    </div>
   </section>
+
+  <div class="card hidden" id="vjobs-card">
+    <div class="label" style="display:flex;justify-content:space-between"><span>🕘 最近送出的文字</span><span class="small">點一下可再送一次</span></div>
+    <ul id="vjobs"></ul>
+  </div>
 
   <div id="pair" class="card hidden">
     <h2>👋 第一次使用：先跟電腦配對</h2>
@@ -252,7 +285,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 
 <script>
 'use strict';
-const APP_VER = '2.16.0';
+const APP_VER = '2.16.1';
 const ACTS = {
   paste:      { ic:'📋', name:'貼上原圖',   desc:'直接貼進電腦正在用的軟體' },
   straighten: { ic:'📄', name:'拉正後貼上', desc:'考卷、講義、課本拍歪了' },
@@ -307,10 +340,13 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('#acts .act').forEach(b => b.onclick = () => setAct(b.dataset.act));
   setAct(act, true);
   setFont(LS.get('puppy_font', 18));
-  $('chk-enter').checked = !!LS.get('puppy_enter', false);
   $('chk-clear').checked = LS.get('puppy_clear', true) !== false;
-  $('chk-enter').onchange = e => LS.set('puppy_enter', e.target.checked);
   $('chk-clear').onchange = e => LS.set('puppy_clear', e.target.checked);
+  document.querySelectorAll('#vmodes button').forEach(b => b.onclick = () => setVMode(b.dataset.m));
+  setVMode(LS.get('puppy_vmode', LS.get('puppy_enter', false) ? 'enter' : 'type'));
+  document.querySelectorAll('#keys button').forEach(b => b.onclick = () => sendKey(b.dataset.k, b.textContent.trim()));
+  vjobs.push(...LS.get('puppy_vhist', []).map(v => Object.assign(v, { state: 'old' })));
+  renderVJobs();
   $('ver-line').textContent = '汪汪快拍 v' + APP_VER;
 
   const p = new URLSearchParams(location.search);
@@ -353,6 +389,7 @@ function switchTab(t, manual){
   $('panel-cam').style.display = t === 'cam' ? 'block' : 'none';
   $('panel-voice').style.display = t === 'voice' ? 'block' : 'none';
   $('jobs-card').style.display = t === 'cam' ? 'block' : 'none';
+  $('vjobs-card').classList.toggle('hidden', t !== 'voice' || !vjobs.length);
 }
 function setAct(a, quiet){
   if (!ACTS[a]) a = 'paste';
@@ -456,7 +493,10 @@ function onPcMsg(m, timeSec, code){
   if (m.type === 'receipt') { pcAlive(); onReceipt(m); return; }
   if (m.type === 'set_resolution' || m.type === 'switch_tab' || m.maxW) {
     if (m.ts && m.ts < Date.now() - 60000) return;
-    if (m.pc === 'online' || (m.ts && m.ts > Date.now() - 20000)) { if (!m.ver) pcLegacy = true; else pcLegacy = false; pcAlive(); }
+    if (m.pc === 'online' || (m.ts && m.ts > Date.now() - 20000)) {
+      if (m.ver) pcLegacy = false; else if (m.type === 'set_resolution') pcLegacy = true;   // 舊版電腦端不會回報
+      pcAlive();
+    }
     if (m.maxW && m.maxH) { maxW = +m.maxW || maxW; maxH = +m.maxH || maxH; }
     if (m.quality) quality = +m.quality || quality;
     const t = m.tab || m.activeTab;
@@ -606,6 +646,7 @@ function afterSent(j){
 function onReceipt(m){
   const key = m.id + ':' + m.stage;
   if (seenReceipt.has(key)) return; seenReceipt.add(key);
+  if (onTextReceipt(m)) return;
   const j = jobs.find(x => x.id === m.id);
   if (!j) return;
   if (m.stage === 'received') { if (j.state !== 'ok' && j.state !== 'warn') setJob(j, 'got', m.msg || '電腦收到了，處理中…', 100); }
@@ -646,6 +687,7 @@ function resend(j, a){
 }
 function openJobSheet(j){
   const box = $('job-acts'); box.innerHTML = '';
+  $('job-sheet').querySelector('h3').textContent = '這張照片要再怎麼傳？';
   Object.keys(ACTS).forEach(k => {
     const A = ACTS[k], b = document.createElement('button');
     b.className = 'act' + (k === j.act ? ' on' : '');
@@ -792,22 +834,98 @@ function insertText(ch){
   ta.value = ta.value.slice(0, s) + ch + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + ch.length; ta.focus();
 }
 function setFont(v){ $('voice-text').style.fontSize = v + 'px'; $('font-range').value = v; LS.set('puppy_font', +v); }
-async function sendVoice(){
-  if (!room) { toast('請先跟電腦配對'); showPair(); return; }
-  const ta = $('voice-text'), text = ta.value.trim();
-  if (!text) { toast('請先說話或打字'); return; }
-  const payload = { type: 'voice_text', id: newId(), text, autoEnter: $('chk-enter').checked, timestamp: Date.now() };
+/* 語音打字：送出方式、回報、最近紀錄、遙控鍵 */
+const VMODES = { type: '⌨️ 直接打字', enter: '⏎ 打完按 Enter', clip: '📋 只放剪貼簿', en: '🌐 翻成英文' };
+let vmode = 'type';
+const vjobs = [];            // {id, text, mode, state, msg}
+const keyJobs = {};
+function setVMode(m){
+  if (!VMODES[m]) m = 'type';
+  vmode = m; LS.set('puppy_vmode', m);
+  document.querySelectorAll('#vmodes button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+}
+function vStatus(text, cls){ const el = $('voice-status'); el.textContent = text; el.className = cls || ''; }
+function postToPc(payload){
   try { if (conn && conn.open) conn.send(payload); } catch (e) {}
-  $('voice-status').textContent = '傳送中…';
+  return fetch(NTFY + 'puppysprite_direct_' + room, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(r => { if (!r.ok) throw new Error(r.status); });
+}
+async function sendVoice(text, mode){
+  if (!room) { toast('請先跟電腦配對'); showPair(); return; }
+  const ta = $('voice-text');
+  const fromBox = text === undefined;
+  text = (fromBox ? ta.value : text).trim(); mode = mode || vmode;
+  if (!text) { toast('請先說話或打字'); return; }
+  const v = { id: newId(), text, mode, state: 'wait', msg: '傳送中…' };
+  vjobs.unshift(v); vjobs.splice(15); renderVJobs();
+  vStatus('傳送中…');
   try {
-    const r = await fetch(NTFY + 'puppysprite_direct_' + room, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!r.ok) throw new Error(r.status);
+    await postToPc({ type: 'voice_text', id: v.id, text, mode, autoEnter: mode === 'enter', timestamp: Date.now() });
     ding(); vibrate(30);
-    $('voice-status').textContent = '✓ 已送出：「' + text.slice(0, 16) + (text.length > 16 ? '…' : '') + '」';
-    if ($('chk-clear').checked) ta.value = '';
+    if (fromBox && $('chk-clear').checked) ta.value = '';
+    if (pcLegacy) { setVJob(v, 'ok', '✓ 已送到電腦'); return; }
+    setVJob(v, 'wait', '已送出，等電腦回報…');
+    setTimeout(() => {
+      if (v.state !== 'wait') return;
+      setVJob(v, 'err', '⚠️ 電腦沒有回應（點一下再送）');
+      if (Date.now() - lastPcSeen > 20000) { setPc('bad', '連不到：' + roomName(room)); vibrate([60, 60, 60]); } else sayHello();
+    }, 15000);
   } catch (e) {
-    $('voice-status').textContent = '⚠️ 沒送出去，請檢查網路後再按一次';
+    setVJob(v, 'err', '⚠️ 沒送出去，請檢查網路（點一下再送）');
   }
+}
+function setVJob(v, state, msg){
+  v.state = state; v.msg = msg;
+  if (vjobs[0] === v) vStatus(msg, state === 'ok' ? 'ok' : state === 'warn' ? 'warn' : state === 'err' ? 'err' : '');
+  renderVJobs();
+}
+function renderVJobs(){
+  const ul = $('vjobs'); ul.innerHTML = '';
+  vjobs.forEach(v => {
+    const li = document.createElement('li');
+    li.className = 'vjob ' + (v.state === 'ok' ? 'ok' : v.state === 'warn' ? 'warn' : v.state === 'err' ? 'err' : '');
+    li.innerHTML = '<div class="tx"></div><div class="st"></div>';
+    li.querySelector('.tx').textContent = v.text;
+    li.querySelector('.st').textContent = (VMODES[v.mode] || '') + '・' + (v.state === 'old' ? '之前送過' : v.msg);
+    li.onclick = () => openVJobSheet(v);
+    ul.appendChild(li);
+  });
+  $('vjobs-card').classList.toggle('hidden', curTab !== 'voice' || !vjobs.length);
+  LS.set('puppy_vhist', vjobs.slice(0, 10).map(v => ({ id: v.id, text: v.text, mode: v.mode })));
+}
+function openVJobSheet(v){
+  const box = $('job-acts'); box.innerHTML = '';
+  $('job-sheet').querySelector('h3').textContent = '這段文字要再怎麼送？';
+  Object.keys(VMODES).forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'act' + (k === v.mode ? ' on' : '');
+    b.innerHTML = '<span><b>' + VMODES[k] + '</b><small>' + (k === v.mode ? '用同樣方式再送一次' : '') + '</small></span>';
+    b.onclick = () => { closeSheet('job-sheet'); sendVoice(v.text, k); };
+    box.appendChild(b);
+  });
+  const ed = document.createElement('button'); ed.className = 'act';
+  ed.innerHTML = '<span><b>✏️ 放回輸入框修改</b><small>改好再按傳送</small></span>';
+  ed.onclick = () => { closeSheet('job-sheet'); $('voice-text').value = v.text; $('voice-text').focus(); };
+  box.appendChild(ed);
+  $('job-sheet').classList.remove('hidden');
+}
+async function sendKey(k, label){
+  if (!room) { toast('請先跟電腦配對'); showPair(); return; }
+  const id = newId(); keyJobs[id] = label;
+  vibrate(15);
+  vStatus('🎮 送出：' + label + '…');
+  try {
+    await postToPc({ type: 'key', id, key: k });
+    if (pcLegacy) vStatus('⚠️ 電腦端是舊版，還不支援遙控鍵，請更新汪汪小精靈', 'warn');
+    else setTimeout(() => { if (keyJobs[id]) { delete keyJobs[id]; vStatus('⚠️ 電腦沒有回應「' + label + '」', 'err'); } }, 12000);
+  } catch (e) { vStatus('⚠️ 沒送出去，請檢查網路', 'err'); }
+}
+function onTextReceipt(m){
+  if (keyJobs[m.id] !== undefined) { delete keyJobs[m.id]; vStatus(m.msg, m.ok ? 'ok' : 'warn'); return true; }
+  const v = vjobs.find(x => x.id === m.id);
+  if (!v) return false;
+  if (m.stage === 'done') { setVJob(v, m.ok ? 'ok' : 'warn', m.msg); m.ok ? vibrate(25) : vibrate([40, 50, 40]); }
+  return true;
 }
 </script>
 </body>
