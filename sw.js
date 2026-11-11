@@ -1,5 +1,5 @@
 // 汪汪快拍 service worker：讓「加到主畫面」後打開更快，網路不穩也能先打開畫面
-const CACHE = 'puppycam-v2.16.3';
+const CACHE = 'puppycam-v2.16.4';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
                './icon-maskable-512.png', './apple-touch-icon.png', './favicon.png',
                './lib/peerjs.min.js', './lib/jsQR.js'];

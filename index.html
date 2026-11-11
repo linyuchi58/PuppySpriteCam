@@ -299,7 +299,7 @@ main{padding:0 12px calc(24px + var(--safe-b))}
 
 <script>
 'use strict';
-const APP_VER = '2.16.3';
+const APP_VER = '2.16.4';
 const ACTS = {
   paste:      { ic:'📋', name:'貼上原圖',   desc:'直接貼進電腦正在用的軟體' },
   straighten: { ic:'📄', name:'拉正後貼上', desc:'考卷、講義、課本拍歪了' },
@@ -870,11 +870,19 @@ const SPOKEN = [   // 口令 → 符號（只有「單獨說出來」的口令�
 ];
 const DEL_LAST = /(?:刪掉|刪除|去掉)(?:上一句|前一句|剛剛那句|剛才那句)|剛剛那句不要|剛才那句不要/;
 
+// 口令前後如果是這些字，表示在「談論」標點本身（例如「加上句號」「句號的用法」），就不轉換
+const CMD_BLOCK_BEFORE = /(?:加上|加個|加一個|一個|兩個|打個|打|寫|用|畫|標上|標|叫做|叫|是|的|要|會|不|沒|自動|怎麼)$/;
+const CMD_BLOCK_AFTER = /^(?:的|是|要|嗎|呢|和|跟|與|符號|鍵|怎|在|放|用|問題|功能|很|也|都)/;
+
 function applySpokenCommands(t){
-  // 口令前後若緊貼著標點或空白／開頭結尾，才當成口令
+  // 手機語音輸入常把口令和前後的字連在一起（例如「今天早上逗號我接了電話」），所以不要求前後有空白
   for (const [re, sym] of SPOKEN) {
-    t = t.replace(new RegExp('(^|[\\s，。、？！,.?!；：])[ \\t]*(' + re.source + ')[ \\t]*(?=$|[\\s，。、？！,.?!；：])', 'g'),
-                  (m, pre) => (/[，。、？！,.?!；：]/.test(pre) && sym !== '\n' && sym !== '\n\n' && sym !== '「' && sym !== '（' ? '' : pre) + sym);
+    t = t.replace(new RegExp('[ \\t]*(?:' + re.source + ')[ \\t]*', 'g'), (m, off, str) => {
+      const before = str.slice(Math.max(0, off - 4), off).replace(/[ \t]+$/, '');
+      const after = str.slice(off + m.length, off + m.length + 3);
+      if (CMD_BLOCK_BEFORE.test(before) || CMD_BLOCK_AFTER.test(after)) return m;
+      return sym;
+    });
   }
   // 「刪掉上一句」：把它前面的那一句拿掉
   let guard = 0;
